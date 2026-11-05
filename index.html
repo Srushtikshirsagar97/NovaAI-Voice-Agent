@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaAI — Real-Time Conversational Voice Agent</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#131c2e',
+                            920: '#0a0f1d',
+                            950: '#060913',
+                        }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-8px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Glassmorphism & Scrollbar Styles */
+        body {
+            background-color: #060913;
+            background-image: 
+                radial-gradient(at 15% 15%, rgba(99, 102, 241, 0.14) 0px, transparent 45%),
+                radial-gradient(at 85% 20%, rgba(16, 185, 129, 0.1) 0px, transparent 45%),
+                radial-gradient(at 50% 85%, rgba(168, 85, 247, 0.12) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.45);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            background: rgba(30, 41, 59, 0.7);
+            border-color: rgba(255, 255, 255, 0.16);
+            transform: translateY(-1px);
+        }
+
+        .glass-card.active {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.22) 0%, rgba(168, 85, 247, 0.15) 100%);
+            border-color: rgba(129, 140, 248, 0.5);
+            box-shadow: 0 0 25px rgba(99, 102, 241, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.25);
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.45);
+        }
+
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: rgba(51, 65, 85, 0.8);
+            border-radius: 999px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #818cf8;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -5px;
+            box-shadow: 0 0 10px rgba(129, 140, 248, 0.6);
+            transition: transform 0.15s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background: #a5b4fc;
+        }
+
+        /* Mic Ripple Effect */
+        .mic-ripple {
+            position: relative;
+        }
+        .mic-ripple.listening::before,
+        .mic-ripple.listening::after {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border-radius: 9999px;
+            border: 2px solid #ef4444;
+            animation: ripple 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+            pointer-events: none;
+        }
+        .mic-ripple.listening::after {
+            animation-delay: -1s;
+        }
+        @keyframes ripple {
+            0% { transform: scale(0.95); opacity: 0.9; }
+            100% { transform: scale(1.55); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+    <!-- Top Navigation Bar -->
+    <header class="w-full z-20 px-4 sm:px-6 pt-4 pb-2">
+        <div class="max-w-[1440px] mx-auto glass-panel rounded-2xl px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+            <!-- Brand Identity -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-emerald-400 p-[1px] shadow-lg shadow-indigo-500/20">
+                    <div class="w-full h-full bg-slate-950 rounded-[11px] flex items-center justify-center">
+                        <i class="ph-fill ph-waveform text-xl text-indigo-400"></i>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">NovaAI Voice</h1>
+                        <span class="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Cloud AI · Groq</span>
+                    </div>
+                    <p class="text-xs text-slate-400 hidden sm:block">Real-Time Neural Voice Agent & Scenario Studio</p>
+                </div>
+            </div>
+
+            <!-- Live Status Indicator & Quick Actions -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Speech Recognition Support Badge -->
+                <div id="speechSupportBadge" class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs text-slate-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>Web Speech Ready</span>
+                </div>
+
+                <!-- Auto-Listen Continuous Mode Toggle -->
+                <button id="continuousToggleBtn" onclick="toggleContinuousMode()" class="glass-card px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs font-medium text-slate-300 hover:text-white" title="Automatically listen again after AI finishes speaking">
+                    <i id="continuousIcon" class="ph ph-arrows-clockwise text-base text-indigo-400"></i>
+                    <span class="hidden sm:inline">Auto-Loop:</span>
+                    <span id="continuousStatusText" class="font-mono text-indigo-400">ON</span>
+                </button>
+
+                <!-- Export Transcript -->
+                <button onclick="exportTranscript()" class="glass-card p-2 rounded-xl text-slate-300 hover:text-white" title="Download Conversation Transcript">
+                    <i class="ph ph-download-simple text-lg"></i>
+                </button>
+
+                <!-- Clear Session -->
+                <button onclick="resetConversation()" class="glass-card px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-medium text-rose-300 hover:bg-rose-500/10 hover:border-rose-500/30 transition-all" title="Reset Current Session">
+                    <i class="ph ph-trash text-base"></i>
+                    <span class="hidden sm:inline">Reset</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main 3-Column Application Layout -->
+    <main class="flex-1 w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-3 grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+        
+        <!-- LEFT PANEL: Scenario Selector & Voice Configuration (3 Columns on Desktop) -->
+        <aside class="lg:col-span-3 flex flex-col gap-4 order-2 lg:order-1">
+            
+            <!-- Scenario Selector Section -->
+            <div class="glass-panel rounded-2xl p-4 flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <i class="ph-fill ph-sparkle text-indigo-400"></i>
+                        Select Agent Persona
+                    </h2>
+                    <span id="activeScenarioBadge" class="text-[11px] font-mono text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">4 Modes</span>
+                </div>
+
+                <!-- Scenario Cards Container -->
+                <div id="scenarioList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
+                    <!-- Populated via JS -->
+                </div>
+
+                <!-- Custom System Prompt Editor Toggle -->
+                <div class="pt-2 border-t border-slate-800/80">
+                    <button onclick="toggleCustomPromptModal()" class="w-full glass-card py-2 px-3 rounded-xl text-xs text-slate-300 hover:text-white flex items-center justify-between">
+                        <span class="flex items-center gap-1.5">
+                            <i class="ph ph-sliders-horizontal text-indigo-400"></i>
+                            Customize Agent Instructions
+                        </span>
+                        <i class="ph ph-caret-right text-slate-500"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Voice & Synthesis Settings Panel -->
+            <div class="glass-panel rounded-2xl p-4 flex flex-col gap-3.5 flex-1">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <i class="ph-fill ph-speaker-high text-emerald-400"></i>
+                        Voice Synthesis Settings
+                    </h2>
+                    <button onclick="testVoiceSample()" class="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-medium">
+                        <i class="ph-fill ph-play-circle"></i> Test Voice
+                    </button>
+                </div>
+
+                <!-- Voice Selection Dropdown -->
+                <div class="flex flex-col gap-1.5">
+                    <label for="voiceSelect" class="text-xs text-slate-300 flex items-center justify-between">
+                        <span>Output Voice</span>
+                        <span id="voiceCountBadge" class="text-[10px] font-mono text-slate-400">Loading...</span>
+                    </label>
+                    <div class="relative">
+                        <select id="voiceSelect" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 appearance-none pr-8 truncate">
+                            <option value="">Default System Voice</option>
+                        </select>
+                        <i class="ph ph-caret-down absolute right-3 top-2.5 text-slate-400 pointer-events-none text-xs"></i>
+                    </div>
+                </div>
+
+                <!-- Speech Language Selector -->
+                <div class="flex flex-col gap-1.5">
+                    <label for="recognitionLang" class="text-xs text-slate-300 flex items-center justify-between">
+                        <span>Recognition Language</span>
+                        <span class="text-[10px] font-mono text-slate-400">BCP-47</span>
+                    </label>
+                    <div class="relative">
+                        <select id="recognitionLang" onchange="updateRecognitionLanguage()" class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 appearance-none pr-8">
+                            <option value="en-US">English (United States)</option>
+                            <option value="en-GB">English (United Kingdom)</option>
+                            <option value="en-IN">English (India)</option>
+                            <option value="es-ES">Español (España)</option>
+                            <option value="fr-FR">Français (France)</option>
+                            <option value="de-DE">Deutsch (Deutschland)</option>
+                            <option value="ja-JP">日本語 (Japanese)</option>
+                            <option value="hi-IN">हिन्दी (Hindi)</option>
+                        </select>
+                        <i class="ph ph-caret-down absolute right-3 top-2.5 text-slate-400 pointer-events-none text-xs"></i>
+                    </div>
+                </div>
+
+                <!-- Speech Rate & Pitch Sliders -->
+                <div class="grid grid-cols-2 gap-3 pt-1">
+                    <div class="glass-card p-2.5 rounded-xl flex flex-col gap-1.5">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-400">Speed</span>
+                            <span id="rateValue" class="font-mono text-indigo-300 text-[11px]">1.05x</span>
+                        </div>
+                        <input type="range" id="rateSlider" min="0.6" max="1.6" step="0.05" value="1.05" oninput="updateVoiceParams()">
+                    </div>
+
+                    <div class="glass-card p-2.5 rounded-xl flex flex-col gap-1.5">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-400">Pitch</span>
+                            <span id="pitchValue" class="font-mono text-indigo-300 text-[11px]">1.00</span>
+                        </div>
+                        <input type="range" id="pitchSlider" min="0.6" max="1.4" step="0.05" value="1.0" oninput="updateVoiceParams()">
+                    </div>
+                </div>
+
+                <!-- Mute AI Voice Toggle -->
+                <div class="mt-auto pt-2 flex items-center justify-between text-xs text-slate-400 border-t border-slate-800/80">
+                    <span>Voice Output Audio</span>
+                    <button id="muteToggleBtn" onclick="toggleMute()" class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 font-medium transition-all">
+                        <i id="muteIcon" class="ph-fill ph-speaker-high"></i>
+                        <span id="muteText">Enabled</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTER STAGE: Animated Audio Visualizer Orb & Voice Controls (5 Columns on Desktop) -->
+        <section class="lg:col-span-5 glass-panel rounded-2xl p-5 flex flex-col justify-between items-center relative overflow-hidden min-h-[480px] lg:min-h-[620px] order-1 lg:order-2">
+            
+            <!-- Ambient Background Glow synced to Agent State -->
+            <div id="ambientStageGlow" class="absolute w-72 h-72 rounded-full bg-indigo-500/15 blur-3xl pointer-events-none transition-all duration-700 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+
+            <!-- Top Stage Header: Current Scenario Info & State Pill -->
+            <div class="w-full flex items-center justify-between z-10">
+                <div class="flex items-center gap-2.5">
+                    <div id="stageScenarioIcon" class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 text-lg">
+                        <i class="ph-fill ph-headset"></i>
+                    </div>
+                    <div>
+                        <h3 id="stageScenarioTitle" class="text-sm font-semibold text-white leading-tight">Customer Support Specialist</h3>
+                        <p id="stageScenarioSubtitle" class="text-[11px] text-slate-400">Order tracking, refunds & troubleshooting</p>
+                    </div>
+                </div>
+
+                <!-- Dynamic State Pill -->
+                <div id="agentStateBadge" class="px-3 py-1 rounded-full bg-slate-800/90 border border-slate-700 text-xs font-mono flex items-center gap-2 shadow-inner">
+                    <span id="stateDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+                    <span id="stateLabel" class="text-slate-300">STANDBY</span>
+                </div>
+            </div>
+
+            <!-- Interactive Canvas Orb & Waveform Visualizer -->
+            <div class="relative w-full flex-1 flex flex-col items-center justify-center my-2 z-10">
+                <div class="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center cursor-pointer group" onclick="toggleListening()" title="Click Orb to Start/Stop Speaking">
+                    <canvas id="orbCanvas" class="w-full h-full block"></canvas>
+                    
+                    <!-- Center Floating Icon Overlay -->
+                    <div id="orbCenterOverlay" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none transition-transform duration-300 group-hover:scale-105">
+                        <i id="orbCenterIcon" class="ph-fill ph-microphone text-3xl text-white/80 drop-shadow-lg"></i>
+                        <span id="orbCenterHint" class="text-[10px] font-mono uppercase tracking-widest text-indigo-200/70 mt-1">Tap to Speak</span>
+                    </div>
+                </div>
+
+                <!-- Live Interim Speech Caption Box -->
+                <div class="w-full max-w-md px-4 mt-2 min-h-[56px] flex flex-col items-center justify-center text-center">
+                    <p id="liveCaptionText" class="text-sm sm:text-base font-medium text-slate-200 leading-snug transition-all duration-200">
+                        "Tap the microphone or orb below to start talking with your AI agent."
+                    </p>
+                    <span id="latencyBadge" class="text-[11px] font-mono text-slate-500 mt-1 hidden"></span>
+                </div>
+            </div>
+
+            <!-- Scenario Starter Prompts (Quick-Tap Pills) -->
+            <div class="w-full z-10 mb-4">
+                <p class="text-[11px] font-mono uppercase tracking-wider text-slate-400 text-center mb-2">Suggested Conversation Starters</p>
+                <div id="quickPromptsContainer" class="flex flex-wrap items-center justify-center gap-1.5">
+                    <!-- Populated dynamically per scenario -->
+                </div>
+            </div>
+
+            <!-- Primary Voice Action Bar -->
+            <div class="w-full z-10 flex items-center justify-center gap-4 pt-3 border-t border-slate-800/80">
+                <!-- Push-to-Talk / Toggle Microphone Button -->
+                <button id="mainMicBtn" onclick="toggleListening()" class="mic-ripple w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-500 hover:from-indigo-500 hover:to-purple-400 text-white shadow-xl shadow-indigo-500/30 flex items-center justify-center transition-all duration-300 active:scale-95 focus:outline-none">
+                    <i id="mainMicIcon" class="ph-fill ph-microphone text-2xl"></i>
+                </button>
+
+                <!-- Interrupt / Stop Speaking Button -->
+                <button id="stopSpeechBtn" onclick="stopAgentSpeech()" disabled class="glass-card px-4 py-3 rounded-2xl text-xs font-medium text-slate-400 disabled:opacity-40 disabled:pointer-events-none hover:text-rose-300 hover:border-rose-500/40 flex items-center gap-2 transition-all">
+                    <i class="ph-fill ph-stop-circle text-lg text-rose-400"></i>
+                    <span>Interrupt AI</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- RIGHT PANEL: Live Transcript & Text Fallback Input (4 Columns on Desktop) -->
+        <section class="lg:col-span-4 glass-panel rounded-2xl flex flex-col justify-between overflow-hidden h-[520px] lg:h-auto order-3">
+            
+            <!-- Transcript Header -->
+            <div class="px-4 py-3.5 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/40">
+                <div class="flex items-center gap-2">
+                    <i class="ph-fill ph-chat-centered-text text-indigo-400 text-lg"></i>
+                    <div>
+                        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-200">Live Transcript</h2>
+                        <p id="turnCounter" class="text-[11px] text-slate-400">0 conversational turns</p>
+                    </div>
+                </div>
+
+                <!-- Copy Transcript Button -->
+                <button onclick="copyTranscriptToClipboard()" class="glass-card px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:text-white flex items-center gap-1.5" title="Copy Full Transcript">
+                    <i id="copyIcon" class="ph ph-copy"></i>
+                    <span id="copyText">Copy</span>
+                </button>
+            </div>
+
+            <!-- Scrollable Conversation Feed -->
+            <div id="transcriptContainer" class="flex-1 p-4 overflow-y-auto space-y-3.5 scroll-smooth">
+                <!-- Populated dynamically with chat bubbles -->
+            </div>
+
+            <!-- Text Fallback Input Bar -->
+            <div class="p-3 bg-slate-900/60 border-t border-slate-800/80">
+                <form id="textFallbackForm" onsubmit="handleTextSubmit(event)" class="flex items-center gap-2">
+                    <div class="relative flex-1">
+                        <input 
+                            type="text" 
+                            id="textPromptInput" 
+                            placeholder="Type a message or use voice..." 
+                            autocomplete="off"
+                            class="w-full bg-slate-950/90 border border-slate-700/80 focus:border-indigo-500 rounded-xl pl-3.5 pr-9 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none transition-colors"
+                        >
+                        <button type="button" onclick="toggleListening()" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-400 transition-colors" title="Use Voice Input">
+                            <i class="ph ph-microphone text-base"></i>
+                        </button>
+                    </div>
+                    <button 
+                        type="submit" 
+                        id="sendTextBtn"
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all flex items-center gap-1.5 shadow-lg shadow-indigo-600/20 active:scale-95"
+                    >
+                        <span>Send</span>
+                        <i class="ph-fill ph-paper-plane-right"></i>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Custom System Instruction Modal -->
+    <div id="customPromptModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-slate-700/80 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <i class="ph-fill ph-terminal-window text-indigo-400 text-xl"></i>
+                    <h3 class="font-semibold text-base text-white">Customize Persona Instructions</h3>
+                </div>
+                <button onclick="toggleCustomPromptModal()" class="text-slate-400 hover:text-white">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+                Modify the system prompt governing the currently selected AI Agent. Keep instructions oriented for spoken conversational brevity.
+            </p>
+            <div>
+                <textarea id="systemPromptTextarea" rows="6" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-xs sm:text-sm text-slate-200 font-mono focus:outline-none focus:border-indigo-500 leading-relaxed"></textarea>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-2">
+                <button onclick="resetScenarioPrompt()" class="glass-card px-3.5 py-2 rounded-xl text-xs text-slate-300 hover:text-white">
+                    Restore Default
+                </button>
+                <button onclick="saveCustomPrompt()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-medium shadow-lg shadow-indigo-600/30">
+                    Save & Apply
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Non-blocking Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Application JavaScript -->
+    <script>
+        /********************************************************************
+         * 1. REAL-WORLD AGENT SCENARIOS & CONFIGURATION
+         ********************************************************************/
+        const API_BASE = ""; // Flask backend serves this page and its API
+
+        const SCENARIOS = [
+            {
+                id: 'support',
+                name: 'Customer Support Agent',
+                shortDesc: 'Order resolution, billing & tech triage',
+                icon: 'ph-headset',
+                accentColor: '#6366f1', // Indigo
+                secondaryColor: '#a855f7',
+                greeting: "Hi there! I'm Aria from NovaCloud Customer Support. How can I help you with your account, order, or technical issue today?",
+                defaultPrompt: `You are Aria, an empathetic, crisp, and solution-oriented Senior Customer Support Agent at NovaCloud Electronics & SaaS.
+CRITICAL VOICE RULES:
+- Keep responses concise (2 to 3 sentences max per turn) and natural for spoken conversation.
+- Never use markdown bullet lists, asterisks, or bold symbols because your text is read aloud via SpeechSynthesis.
+- Ask one clarifying question at a time (e.g., asking for an order number, email, or device status).
+- Proactively offer practical solutions such as instant replacement, expedited refund, or guided troubleshooting.`,
+                starters: [
+                    "Where is my order #NC-4920?",
+                    "I was billed twice this month",
+                    "My smart hub won't connect to Wi-Fi"
+                ]
+            },
+            {
+                id: 'interviewer',
+                name: 'Technical Interviewer',
+                shortDesc: 'System design, coding & behavioral mock',
+                icon: 'ph-code-block',
+                accentColor: '#10b981', // Emerald
+                secondaryColor: '#06b6d4',
+                greeting: "Welcome! I'm Marcus, Principal Engineer. Today we'll conduct a technical mock interview. What role or tech stack are you interviewing for?",
+                defaultPrompt: `You are Marcus, a seasoned Staff Software Engineer conducting a real-time voice technical & behavioral interview.
+CRITICAL VOICE RULES:
+- Speak naturally without markdown formatting, code blocks, or special symbols.
+- Keep responses brief (2 to 4 sentences). First give brief constructive feedback on the candidate's previous answer, then ask a sharp follow-up question probing trade-offs, scalability, edge cases, or STAR behavioral examples.
+- Maintain a supportive yet rigorous engineering standard.`,
+                starters: [
+                    "I'm interviewing for Senior Frontend",
+                    "Quiz me on distributed caching",
+                    "Ask me a behavioral leadership question"
+                ]
+            },
+            {
+                id: 'tutor',
+                name: 'Language & Fluency Tutor',
+                shortDesc: 'Immersive conversational practice & feedback',
+                icon: 'ph-translate',
+                accentColor: '#f59e0b', // Amber
+                secondaryColor: '#ec4899',
+                greeting: "Hello! I'm Elena, your personal language and communication coach. Which language would you like to practice today, and what's your current level?",
+                defaultPrompt: `You are Elena, an encouraging and perceptive polyglot Language Tutor and Spoken Fluency Coach.
+CRITICAL VOICE RULES:
+- Keep every response short (2 to 3 sentences) and conversational. Do not use asterisks, bullet points, or emojis.
+- Gently correct grammar or vocabulary slips from the user's last turn in a warm way, then keep the roleplay conversation flowing with an engaging open-ended question.
+- Adapt to whatever language or proficiency level the user requests.`,
+                starters: [
+                    "Let's practice ordering at a café in Spanish",
+                    "Help me sound more confident in English",
+                    "Teach me polite Japanese travel phrases"
+                ]
+            },
+            {
+                id: 'executive',
+                name: 'Executive AI Assistant',
+                shortDesc: 'Daily briefings, strategy & decision prep',
+                icon: 'ph-briefcase',
+                accentColor: '#ec4899', // Pink/Rose
+                secondaryColor: '#8b5cf6',
+                greeting: "Good day. I'm Atlas, your Chief of Staff and Executive AI Assistant. Ready to prioritize your schedule, draft communications, or brainstorm strategy?",
+                defaultPrompt: `You are Atlas, a sharp, high-agency Executive Assistant and Strategic Advisor to a busy founder/executive.
+CRITICAL VOICE RULES:
+- Speak in crisp, high-signal spoken English with zero markdown, zero asterisks, and zero bullet symbols.
+- Keep responses under 3 sentences. Summarize action items clearly, challenge assumptions constructively, and help the user make rapid decisions.`,
+                starters: [
+                    "Help me structure my 9 AM board update",
+                    "Prioritize 3 urgent tasks for today",
+                    "Draft a polite decline to a vendor pitch"
+                ]
+            }
+        ];
+
+        /********************************************************************
+         * 2. APPLICATION STATE
+         ********************************************************************/
+        let currentScenario = SCENARIOS[0];
+        let customPrompts = {}; // Stores user-customized system prompts by scenario ID
+        let conversationHistory = []; // Array of { role: 'user'|'model', text: string, timestamp: string }
+        
+        // Agent State Machine: 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING'
+        let agentState = 'IDLE';
+        let continuousMode = true;
+        let isMuted = false;
+
+        // Web Speech API instances
+        let recognition = null;
+        let isRecognitionSupported = false;
+        let synthesis = window.speechSynthesis;
+        let availableVoices = [];
+        let selectedVoiceURI = "";
+        let speechRate = 1.05;
+        let speechPitch = 1.0;
+
+        // Audio Visualizer Animation State
+        let orbPhase = 0;
+        let simulatedEnergy = 0.08;
+        let targetEnergy = 0.08;
+
+        /********************************************************************
+         * 3. INITIALIZATION ON LOAD
+         ********************************************************************/
+        window.onload = function () {
+            initScenarioCards();
+            initSpeechSynthesisVoices();
+            initSpeechRecognition();
+            initOrbVisualizer();
+            selectScenario(SCENARIOS[0].id, false);
+        };
+
+        /********************************************************************
+         * 4. UI RENDERING: SCENARIOS & TRANSCRIPT
+         ********************************************************************/
+        function initScenarioCards() {
+            const container = document.getElementById('scenarioList');
+            container.innerHTML = '';
+
+            SCENARIOS.forEach(sc => {
+                const isSelected = sc.id === currentScenario.id;
+                const btn = document.createElement('button');
+                btn.id = `scenario-card-${sc.id}`;
+                btn.onclick = () => selectScenario(sc.id, true);
+                btn.className = `glass-card text-left p-3 rounded-xl flex items-start gap-3 w-full ${isSelected ? 'active' : ''}`;
+                btn.innerHTML = `
+                    <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style="background: ${sc.accentColor}22; border: 1px solid ${sc.accentColor}55; color: ${sc.accentColor}">
+                        <i class="ph-fill ${sc.icon} text-lg"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center justify-between gap-1">
+                            <h3 class="text-xs font-semibold text-white truncate">${sc.name}</h3>
+                            ${isSelected ? '<span class="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></span>' : ''}
+                        </div>
+                        <p class="text-[11px] text-slate-400 line-clamp-1 mt-0.5">${sc.shortDesc}</p>
+                    </div>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        function selectScenario(scenarioId, speakGreeting = true) {
+            // Stop ongoing speech or recognition
+            stopListening();
+            stopAgentSpeech();
+
+            const found = SCENARIOS.find(s => s.id === scenarioId);
+            if (!found) return;
+            currentScenario = found;
+
+            // Update card highlights
+            initScenarioCards();
+
+            // Update Center Stage Header
+            const iconBox = document.getElementById('stageScenarioIcon');
+            iconBox.innerHTML = `<i class="ph-fill ${currentScenario.icon}"></i>`;
+            iconBox.style.backgroundColor = `${currentScenario.accentColor}22`;
+            iconBox.style.borderColor = `${currentScenario.accentColor}55`;
+            iconBox.style.color = currentScenario.accentColor;
+
+            document.getElementById('stageScenarioTitle').textContent = currentScenario.name;
+            document.getElementById('stageScenarioSubtitle').textContent = currentScenario.shortDesc;
+
+            // Render Quick Starter Pills
+            const startersContainer = document.getElementById('quickPromptsContainer');
+            startersContainer.innerHTML = '';
+            currentScenario.starters.forEach(promptText => {
+                const pill = document.createElement('button');
+                pill.className = "glass-card px-3 py-1.5 rounded-full text-xs text-slate-300 hover:text-white hover:border-indigo-400/50 transition-all";
+                pill.textContent = `"${promptText}"`;
+                pill.onclick = () => processUserMessage(promptText);
+                startersContainer.appendChild(pill);
+            });
+
+            // Reset Conversation History with Initial Greeting
+            conversationHistory = [];
+            document.getElementById('transcriptContainer').innerHTML = '';
+            
+            addMessageToTranscript('model', currentScenario.greeting);
+            document.getElementById('liveCaptionText').textContent = `"${currentScenario.greeting}"`;
+
+            if (speakGreeting && !isMuted) {
+                speakText(currentScenario.greeting, false);
+            }
+        }
+
+        function addMessageToTranscript(role, text) {
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            conversationHistory.push({ role, text, timestamp: timeStr });
+
+            const container = document.getElementById('transcriptContainer');
+            const wrapper = document.createElement('div');
+            const isUser = role === 'user';
+
+            wrapper.className = `flex flex-col ${isUser ? 'items-end' : 'items-start'}`;
+            wrapper.innerHTML = `
+                <div class="flex items-center gap-1.5 mb-1 px-1">
+                    <span class="text-[10px] font-semibold uppercase tracking-wider ${isUser ? 'text-indigo-400' : 'text-emerald-400'}">
+                        ${isUser ? 'You' : currentScenario.name.split(' ')[0]}
+                    </span>
+                    <span class="text-[10px] font-mono text-slate-500">${timeStr}</span>
+                </div>
+                <div class="max-w-[88%] rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed ${
+                    isUser 
+                        ? 'bg-indigo-600/90 text-white rounded-br-xs shadow-md shadow-indigo-950/50' 
+                        : 'bg-slate-800/85 text-slate-100 border border-slate-700/70 rounded-bl-xs'
+                }">
+                    ${escapeHtml(text)}
+                </div>
+            `;
+
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+
+            // Update turn counter
+            const userTurns = conversationHistory.filter(m => m.role === 'user').length;
+            document.getElementById('turnCounter').textContent = `${userTurns} conversational ${userTurns === 1 ? 'turn' : 'turns'}`;
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        /********************************************************************
+         * 5. WEB SPEECH API: SPEECH RECOGNITION (STT) & SYNTHESIS (TTS)
+         ********************************************************************/
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const badge = document.getElementById('speechSupportBadge');
+
+            if (!SpeechRecognition) {
+                isRecognitionSupported = false;
+                badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span><span>Text Fallback Mode</span>`;
+                showToast("Web Speech Recognition is not supported in this browser. Try Chrome or Edge, or use the text input.", "warning");
+                return;
+            }
+
+            isRecognitionSupported = true;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.lang = document.getElementById('recognitionLang').value || 'en-US';
+
+            let finalTranscriptForTurn = '';
+
+            recognition.onstart = () => {
+                finalTranscriptForTurn = '';
+                setAgentState('LISTENING');
+                document.getElementById('liveCaptionText').textContent = "Listening... speak now";
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    const transcriptPiece = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscriptForTurn += transcriptPiece;
+                    } else {
+                        interimTranscript += transcriptPiece;
+                    }
+                }
+
+                // Pulse visualizer energy based on active speech
+                targetEnergy = 0.65 + Math.min(0.35, (interimTranscript.length % 15) * 0.025);
+
+                const displayStr = (finalTranscriptForTurn + ' ' + interimTranscript).trim();
+                if (displayStr) {
+                    document.getElementById('liveCaptionText').textContent = `"${displayStr}"`;
+                }
+            };
+
+            recognition.onerror = (event) => {
+                if (event.error === 'no-speech') {
+                    setAgentState('IDLE');
+                    document.getElementById('liveCaptionText').textContent = "No speech detected. Tap the microphone to try again.";
+                } else if (event.error === 'not-allowed') {
+                    setAgentState('IDLE');
+                    showToast("Microphone permission denied. Please allow mic access or use text input.", "error");
+                } else if (event.error !== 'aborted') {
+                    setAgentState('IDLE');
+                }
+            };
+
+            recognition.onend = () => {
+                const captured = finalTranscriptForTurn.trim();
+                if (captured.length > 0) {
+                    processUserMessage(captured);
+                } else if (agentState === 'LISTENING') {
+                    setAgentState('IDLE');
+                }
+            };
+        }
+
+        function updateRecognitionLanguage() {
+            const lang = document.getElementById('recognitionLang').value;
+            if (recognition) {
+                recognition.lang = lang;
+                showToast(`Speech recognition language set to ${lang}`, "info");
+            }
+        }
+
+        function toggleListening() {
+            if (agentState === 'SPEAKING') {
+                stopAgentSpeech();
+            }
+
+            if (agentState === 'LISTENING') {
+                stopListening();
+                return;
+            }
+
+            if (!isRecognitionSupported) {
+                document.getElementById('textPromptInput').focus();
+                showToast("Voice recognition unavailable in this browser. Type your message on the right!", "warning");
+                return;
+            }
+
+            try {
+                recognition.start();
+            } catch (err) {
+                // Handle case where recognition is already started
+                recognition.stop();
+            }
+        }
+
+        function stopListening() {
+            if (recognition && agentState === 'LISTENING') {
+                try {
+                    recognition.stop();
+                } catch (e) {}
+            }
+            if (agentState === 'LISTENING') {
+                setAgentState('IDLE');
+            }
+        }
+
+        function initSpeechSynthesisVoices() {
+            if (!synthesis) return;
+
+            const populateVoices = () => {
+                availableVoices = synthesis.getVoices();
+                const select = document.getElementById('voiceSelect');
+                const badge = document.getElementById('voiceCountBadge');
+
+                if (availableVoices.length === 0) return;
+
+                badge.textContent = `${availableVoices.length} voices`;
+                select.innerHTML = '';
+
+                // Prioritize high-quality natural/Google/Microsoft voices
+                const sortedVoices = [...availableVoices].sort((a, b) => {
+                    const aNatural = a.name.includes('Natural') || a.name.includes('Google') || a.name.includes('Premium');
+                    const bNatural = b.name.includes('Natural') || b.name.includes('Google') || b.name.includes('Premium');
+                    if (aNatural && !bNatural) return -1;
+                    if (!aNatural && bNatural) return 1;
+                    return a.lang.localeCompare(b.lang);
+                });
+
+                sortedVoices.forEach((voice) => {
+                    const opt = document.createElement('option');
+                    opt.value = voice.voiceURI;
+                    opt.textContent = `${voice.name} (${voice.lang})`;
+                    select.appendChild(opt);
+                });
+
+                // Pick a pleasant English default voice if not already chosen
+                if (!selectedVoiceURI) {
+                    const preferred = sortedVoices.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha')));
+                    if (preferred) {
+                        selectedVoiceURI = preferred.voiceURI;
+                        select.value = selectedVoiceURI;
+                    }
+                }
+            };
+
+            populateVoices();
+            if (speechSynthesis.onvoiceschanged !== undefined) {
+                speechSynthesis.onvoiceschanged = populateVoices;
+            }
+
+            document.getElementById('voiceSelect').addEventListener('change', (e) => {
+                selectedVoiceURI = e.target.value;
+            });
+        }
+
+        function updateVoiceParams() {
+            speechRate = parseFloat(document.getElementById('rateSlider').value);
+            speechPitch = parseFloat(document.getElementById('pitchSlider').value);
+            document.getElementById('rateValue').textContent = `${speechRate.toFixed(2)}x`;
+            document.getElementById('pitchValue').textContent = speechPitch.toFixed(2);
+        }
+
+        function speakText(text, autoListenAfter = true) {
+            if (!synthesis || isMuted) {
+                setAgentState('IDLE');
+                return;
+            }
+
+            // Cancel any ongoing speech
+            synthesis.cancel();
+
+            // Clean any stray markdown symbols before speaking
+            const cleanSpeechText = text.replace(/[*#_`~]/g, '');
+            const utterance = new SpeechSynthesisUtterance(cleanSpeechText);
+
+            const chosenVoice = availableVoices.find(v => v.voiceURI === selectedVoiceURI);
+            if (chosenVoice) {
+                utterance.voice = chosenVoice;
+            }
+
+            utterance.rate = speechRate;
+            utterance.pitch = speechPitch;
+
+            utterance.onstart = () => {
+                setAgentState('SPEAKING');
+            };
+
+            // Boundary events animate the visualizer orb dynamically with each spoken word
+            utterance.onboundary = () => {
+                targetEnergy = 0.55 + Math.random() * 0.45;
+            };
+
+            utterance.onend = () => {
+                setAgentState('IDLE');
+                if (autoListenAfter && continuousMode && isRecognitionSupported) {
+                    setTimeout(() => {
+                        if (agentState === 'IDLE') {
+                            try { recognition.start(); } catch (e) {}
+                        }
+                    }, 350);
+                }
+            };
+
+            utterance.onerror = () => {
+                setAgentState('IDLE');
+            };
+
+            synthesis.speak(utterance);
+        }
+
+        function stopAgentSpeech() {
+            if (synthesis) {
+                synthesis.cancel();
+            }
+            if (agentState === 'SPEAKING') {
+                setAgentState('IDLE');
+            }
+        }
+
+        function testVoiceSample() {
+            speakText(`Hello! This is a voice preview for ${currentScenario.name}.`, false);
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const btn = document.getElementById('muteToggleBtn');
+            const icon = document.getElementById('muteIcon');
+            const txt = document.getElementById('muteText');
+
+            if (isMuted) {
+                stopAgentSpeech();
+                btn.className = "px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 flex items-center gap-1 font-medium transition-all";
+                icon.className = "ph-fill ph-speaker-slash";
+                txt.textContent = "Muted";
+            } else {
+                btn.className = "px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 font-medium transition-all";
+                icon.className = "ph-fill ph-speaker-high";
+                txt.textContent = "Enabled";
+            }
+        }
+
+        function toggleContinuousMode() {
+            continuousMode = !continuousMode;
+            const statusText = document.getElementById('continuousStatusText');
+            statusText.textContent = continuousMode ? 'ON' : 'OFF';
+            statusText.className = continuousMode ? 'font-mono text-indigo-400' : 'font-mono text-slate-500';
+            showToast(`Auto-Loop continuous listening turned ${continuousMode ? 'ON' : 'OFF'}`, "info");
+        }
+
+        /********************************************************************
+         * 6. GROQ AI API INTEGRATION
+         ********************************************************************/
+        async function processUserMessage(userText) {
+            const trimmed = userText.trim();
+            if (!trimmed) return;
+
+            stopListening();
+            stopAgentSpeech();
+
+            // Add user message to transcript
+            addMessageToTranscript('user', trimmed);
+            document.getElementById('liveCaptionText').textContent = `"${trimmed}"`;
+
+            // Enter THINKING state
+            setAgentState('THINKING');
+            const startTime = performance.now();
+
+            try {
+                const replyText = await callAIBackend(trimmed);
+                const elapsedMs = Math.round(performance.now() - startTime);
+
+                // Show response latency badge
+                const latencyBadge = document.getElementById('latencyBadge');
+                latencyBadge.textContent = `AI response in ${elapsedMs}ms`;
+                latencyBadge.classList.remove('hidden');
+
+                // Add AI reply to transcript & caption
+                addMessageToTranscript('model', replyText);
+                document.getElementById('liveCaptionText').textContent = `"${replyText}"`;
+
+                // Speak response via Web Speech Synthesis
+                speakText(replyText, true);
+            } catch (error) {
+                setAgentState('IDLE');
+                const fallbackMsg = error && error.message ? `Sorry, I could not complete that request: ${error.message}` : "Sorry, I could not reach the AI service. Please try again.";
+                addMessageToTranscript('model', fallbackMsg);
+                document.getElementById('liveCaptionText').textContent = fallbackMsg;
+                showToast("Failed to reach Groq. Check your API key and internet connection.", "error");
+            }
+        }
+
+        async function callAIBackend(latestUserMessage) {
+            const activeSystemInstruction = customPrompts[currentScenario.id] || currentScenario.defaultPrompt;
+            const sessionId = getSessionId();
+            const history = conversationHistory.map(item => ({
+                role: item.role === 'user' ? 'user' : 'model',
+                text: item.text
+            }));
+
+            const response = await fetch(`${API_BASE}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    scenario_id: currentScenario.id,
+                    scenario_name: currentScenario.name,
+                    system_instruction: activeSystemInstruction,
+                    latest_user_message: latestUserMessage,
+                    history
+                })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(data.error || `Server error (${response.status})`);
+            }
+            return data.reply;
+        }
+
+        function getSessionId() {
+            let id = localStorage.getItem('novaai_session_id');
+            if (!id) {
+                id = (window.crypto && crypto.randomUUID)
+                    ? crypto.randomUUID()
+                    : `session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+                localStorage.setItem('novaai_session_id', id);
+            }
+            return id;
+        }
+
+        function handleTextSubmit(event) {
+            event.preventDefault();
+            const inputEl = document.getElementById('textPromptInput');
+            const val = inputEl.value.trim();
+            if (!val) return;
+            inputEl.value = '';
+            processUserMessage(val);
+        }
+
+        /********************************************************************
+         * 7. AGENT STATE MACHINE & UI FEEDBACK
+         ********************************************************************/
+        function setAgentState(newState) {
+            agentState = newState;
+
+            const stateDot = document.getElementById('stateDot');
+            const stateLabel = document.getElementById('stateLabel');
+            const mainMicBtn = document.getElementById('mainMicBtn');
+            const mainMicIcon = document.getElementById('mainMicIcon');
+            const stopSpeechBtn = document.getElementById('stopSpeechBtn');
+            const orbCenterIcon = document.getElementById('orbCenterIcon');
+            const orbCenterHint = document.getElementById('orbCenterHint');
+            const ambientGlow = document.getElementById('ambientStageGlow');
+
+            // Reset mic button ripple
+            mainMicBtn.classList.remove('listening');
+
+            if (newState === 'IDLE') {
+                stateDot.className = "w-2 h-2 rounded-full bg-slate-400";
+                stateLabel.textContent = "STANDBY";
+                stateLabel.className = "text-slate-300";
+                mainMicIcon.className = "ph-fill ph-microphone text-2xl";
+                mainMicBtn.className = "mic-ripple w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-500 hover:from-indigo-500 hover:to-purple-400 text-white shadow-xl shadow-indigo-500/30 flex items-center justify-center transition-all duration-300 active:scale-95";
+                stopSpeechBtn.disabled = true;
+                orbCenterIcon.className = "ph-fill ph-microphone text-3xl text-white/85 drop-shadow-lg";
+                orbCenterHint.textContent = "Tap to Speak";
+                ambientGlow.className = "absolute w-72 h-72 rounded-full bg-indigo-500/15 blur-3xl pointer-events-none transition-all duration-700 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2";
+                targetEnergy = 0.08;
+            } 
+            else if (newState === 'LISTENING') {
+                stateDot.className = "w-2 h-2 rounded-full bg-rose-500 animate-ping";
+                stateLabel.textContent = "LISTENING";
+                stateLabel.className = "text-rose-400 font-semibold";
+                mainMicBtn.classList.add('listening');
+                mainMicIcon.className = "ph-fill ph-waveform text-2xl animate-pulse";
+                mainMicBtn.className = "mic-ripple listening w-16 h-16 rounded-full bg-gradient-to-tr from-rose-600 to-amber-500 text-white shadow-xl shadow-rose-500/40 flex items-center justify-center transition-all duration-300";
+                stopSpeechBtn.disabled = true;
+                orbCenterIcon.className = "ph-fill ph-ear text-3xl text-rose-200 drop-shadow-lg animate-pulse";
+                orbCenterHint.textContent = "Listening...";
+                ambientGlow.className = "absolute w-80 h-80 rounded-full bg-rose-500/20 blur-3xl pointer-events-none transition-all duration-700 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2";
+                targetEnergy = 0.45;
+            } 
+            else if (newState === 'THINKING') {
+                stateDot.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse";
+                stateLabel.textContent = "THINKING";
+                stateLabel.className = "text-amber-300 font-semibold";
+                mainMicIcon.className = "ph ph-spinner-gap text-2xl animate-spin";
+                stopSpeechBtn.disabled = true;
+                orbCenterIcon.className = "ph-fill ph-brain text-3xl text-amber-200 animate-bounce";
+                orbCenterHint.textContent = "Processing...";
+                ambientGlow.className = "absolute w-80 h-80 rounded-full bg-amber-500/20 blur-3xl pointer-events-none transition-all duration-700 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2";
+                targetEnergy = 0.3;
+            } 
+            else if (newState === 'SPEAKING') {
+                stateDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-ping";
+                stateLabel.textContent = "SPEAKING";
+                stateLabel.className = "text-emerald-300 font-semibold";
+                mainMicIcon.className = "ph-fill ph-microphone text-2xl";
+                stopSpeechBtn.disabled = false;
+                orbCenterIcon.className = "ph-fill ph-speaker-high text-3xl text-emerald-200";
+                orbCenterHint.textContent = "Tap to Interrupt";
+                ambientGlow.className = "absolute w-80 h-80 rounded-full bg-emerald-500/25 blur-3xl pointer-events-none transition-all duration-700 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2";
+                targetEnergy = 0.7;
+            }
+        }
+
+        /********************************************************************
+         * 8. HTML5 CANVAS ANIMATED AUDIO ORB & WAVEFORM VISUALIZER
+         ********************************************************************/
+        function initOrbVisualizer() {
+            const canvas = document.getElementById('orbCanvas');
+            const ctx = canvas.getContext('2d');
+
+            function resizeCanvas() {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            function renderLoop() {
+                const width = canvas.width / (window.devicePixelRatio || 1);
+                const height = canvas.height / (window.devicePixelRatio || 1);
+                const cx = width / 2;
+                const cy = height / 2;
+                const baseRadius = Math.min(width, height) * 0.28;
+
+                ctx.clearRect(0, 0, width, height);
+
+                // Smoothly interpolate energy
+                if (agentState === 'SPEAKING') {
+                    // Organic syllabic oscillation while speaking
+                    targetEnergy = 0.45 + 0.35 * Math.abs(Math.sin(orbPhase * 2.3)) * Math.cos(orbPhase * 1.1);
+                } else if (agentState === 'LISTENING') {
+                    targetEnergy = Math.max(0.32, targetEnergy * 0.96);
+                } else if (agentState === 'THINKING') {
+                    targetEnergy = 0.28 + 0.12 * Math.sin(orbPhase * 4);
+                } else {
+                    targetEnergy = 0.08;
+                }
+
+                simulatedEnergy += (targetEnergy - simulatedEnergy) * 0.12;
+                orbPhase += 0.035 + simulatedEnergy * 0.06;
+
+                // Determine palette by state & scenario
+                let primaryColor = currentScenario.accentColor || '#6366f1';
+                let secondaryColor = currentScenario.secondaryColor || '#a855f7';
+
+                if (agentState === 'LISTENING') {
+                    primaryColor = '#f43f5e';
+                    secondaryColor = '#fb923c';
+                } else if (agentState === 'THINKING') {
+                    primaryColor = '#f59e0b';
+                    secondaryColor = '#818cf8';
+                } else if (agentState === 'SPEAKING') {
+                    primaryColor = '#10b981';
+                    secondaryColor = currentScenario.accentColor;
+                }
+
+                // Draw 3 multi-layered harmonic wave rings
+                for (let layer = 0; layer < 3; layer++) {
+                    ctx.beginPath();
+                    const points = 90;
+                    const layerOffset = layer * 1.4;
+                    const radiusScale = 1 + layer * 0.12;
+
+                    for (let i = 0; i <= points; i++) {
+                        const angle = (i / points) * Math.PI * 2;
+                        const wave1 = Math.sin(angle * 4 + orbPhase + layerOffset) * (14 * simulatedEnergy);
+                        const wave2 = Math.cos(angle * 6 - orbPhase * 1.3 + layer) * (9 * simulatedEnergy);
+                        const r = (baseRadius * radiusScale) + wave1 + wave2;
+
+                        const x = cx + Math.cos(angle) * r;
+                        const y = cy + Math.sin(angle) * r;
+
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.closePath();
+
+                    const grad = ctx.createLinearGradient(cx - baseRadius, cy - baseRadius, cx + baseRadius, cy + baseRadius);
+                    grad.addColorStop(0, primaryColor + (layer === 0 ? '66' : '33'));
+                    grad.addColorStop(1, secondaryColor + (layer === 0 ? '66' : '22'));
+
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+
+                    ctx.lineWidth = layer === 0 ? 2 : 1;
+                    ctx.strokeStyle = layer === 0 ? primaryColor + 'cc' : secondaryColor + '66';
+                    ctx.stroke();
+                }
+
+                // Draw Inner Core Sphere
+                const coreGrad = ctx.createRadialGradient(cx - 12, cy - 12, 4, cx, cy, baseRadius * 0.92);
+                coreGrad.addColorStop(0, primaryColor);
+                coreGrad.addColorStop(0.65, secondaryColor + 'aa');
+                coreGrad.addColorStop(1, '#090d16ee');
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, baseRadius * (0.82 + simulatedEnergy * 0.1), 0, Math.PI * 2);
+                ctx.fillStyle = coreGrad;
+                ctx.fill();
+
+                requestAnimationFrame(renderLoop);
+            }
+
+            requestAnimationFrame(renderLoop);
+        }
+
+        /********************************************************************
+         * 9. UTILITY FUNCTIONS: MODALS, EXPORT, RESET & TOASTS
+         ********************************************************************/
+        function toggleCustomPromptModal() {
+            const modal = document.getElementById('customPromptModal');
+            const textarea = document.getElementById('systemPromptTextarea');
+
+            if (modal.classList.contains('hidden')) {
+                textarea.value = customPrompts[currentScenario.id] || currentScenario.defaultPrompt;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function saveCustomPrompt() {
+            const val = document.getElementById('systemPromptTextarea').value.trim();
+            if (val) {
+                customPrompts[currentScenario.id] = val;
+                showToast(`Updated system instructions for ${currentScenario.name}`, "info");
+            }
+            toggleCustomPromptModal();
+        }
+
+        function resetScenarioPrompt() {
+            delete customPrompts[currentScenario.id];
+            document.getElementById('systemPromptTextarea').value = currentScenario.defaultPrompt;
+            showToast("Restored default scenario prompt", "info");
+        }
+
+        function resetConversation() {
+            selectScenario(currentScenario.id, false);
+            showToast("Conversation session reset", "info");
+        }
+
+        function copyTranscriptToClipboard() {
+            if (conversationHistory.length === 0) return;
+
+            const formatted = conversationHistory
+                .map(m => `[${m.timestamp}] ${m.role === 'user' ? 'You' : currentScenario.name}: ${m.text}`)
+                .join('\n\n');
+
+            const tempArea = document.createElement('textarea');
+            tempArea.value = formatted;
+            document.body.appendChild(tempArea);
+            tempArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempArea);
+
+            const copyText = document.getElementById('copyText');
+            copyText.textContent = "Copied!";
+            setTimeout(() => { copyText.textContent = "Copy"; }, 2000);
+            showToast("Transcript copied to clipboard", "info");
+        }
+
+        function exportTranscript() {
+            if (conversationHistory.length === 0) return;
+
+            const header = `NovaAI Voice Agent Transcript\nScenario: ${currentScenario.name}\nDate: ${new Date().toLocaleString()}\n==========================================\n\n`;
+            const body = conversationHistory
+                .map(m => `[${m.timestamp}] ${m.role.toUpperCase()}:\n${m.text}`)
+                .join('\n\n------------------------------------------\n\n');
+
+            const blob = new Blob([header + body], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nova-voice-transcript-${currentScenario.id}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast("Transcript downloaded", "info");
+        }
+
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+
+            const colorMap = {
+                info: 'border-indigo-500/40 bg-slate-900/90 text-indigo-200',
+                warning: 'border-amber-500/40 bg-slate-900/90 text-amber-200',
+                error: 'border-rose-500/40 bg-slate-900/90 text-rose-200'
+            };
+
+            toast.className = `px-4 py-2.5 rounded-xl border backdrop-blur-md shadow-xl text-xs font-medium flex items-center gap-2 transition-all duration-300 ${colorMap[type] || colorMap.info}`;
+            toast.innerHTML = `
+                <i class="ph-fill ${type === 'error' ? 'ph-warning-octagon text-rose-400' : type === 'warning' ? 'ph-warning text-amber-400' : 'ph-check-circle text-indigo-400'} text-base"></i>
+                <span>${escapeHtml(message)}</span>
+            `;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(8px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3400);
+        }
+    </script>
+</body>
+</html>
